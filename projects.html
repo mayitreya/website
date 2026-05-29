@@ -174,6 +174,18 @@
       <h3><span class="hash">#</span> Gripes &amp; issues</h3>
       <div class="gripe-grid">
         <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">The hosted Docker service missed the point</span><span class="gripe-tag">resolved</span></div>
+          <p>PureMark started from spawnia's Pandoc Docker container, served through a small web interface and hosted on Render. It worked, but anything you converted went through a server and required an internet connection. For a writing tool that's the wrong foundation. The local-first direction came directly from wanting to cut that dependency entirely.</p>
+        </div>
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">In-browser WASM conversion seemed like the answer</span><span class="gripe-tag">resolved</span></div>
+          <p>The next attempt: process everything in the browser with WASM so nothing leaves your machine and no install is required. The WASM compilation pipeline turned out to be a bigger surface than expected, and the browser's security model adds real friction that isn't obvious until you're already deep in it. Couldn't get it to a state worth shipping.</p>
+        </div>
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">SwiftLaTeX + pandoc-wasm was clever until images showed up</span><span class="gripe-tag">resolved</span></div>
+          <p>One more attempt at making the browser approach work: pandoc-wasm converts Markdown to LaTeX, SwiftLaTeX renders that LaTeX to PDF, all in-browser. It nearly worked. The image problem killed it. To survive the browser pipeline, every image had to be base64-encoded and embedded as raw text inside the document. File sizes became absurd. That was the point where the browser approach got scrapped for a Tauri desktop app.</p>
+        </div>
+        <div class="gripe fixed">
           <div class="gripe-head"><span class="g-title">WebKitGTK taints SVG-drawn canvases</span><span class="gripe-tag">resolved</span></div>
           <p>Mermaid diagrams render to SVG in the browser, then get rasterized to PNG through a <code>&lt;canvas&gt;</code> so Pandoc can embed them. On Linux, Tauri uses the WebKitGTK webview, and it <strong>taints any canvas drawn from a <code>blob:</code>-URL SVG</strong>, so <code>canvas.toBlob()</code> throws <code>SecurityError</code>. The fix: feed the SVG in as a percent-encoded <code>data:</code> URL instead, which bypasses the taint. (There's a sibling workaround in the build script too, <code>WEBKIT_DISABLE_DMABUF_RENDERER=1</code>, to dodge a WebKitGTK rendering bug that blanks the window on some GPUs.)</p>
         </div>
