@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Projects by Mayitreya Pasumarthy</title>
+  <meta name="description" content="In-depth write-ups of Mayitreya Pasumarthy's projects: architecture, decisions, and the real problems encountered along the way.">
+  <link rel="preconnect" href="https://fonts.cdnfonts.com" crossorigin>
+  <link href="https://fonts.cdnfonts.com/css/selawik" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪟</text></svg>">
+</head>
+<body>
+
+  <header class="proj-hero">
+    <div class="win">
+      <div class="win-bar">
+        <span class="win-title"><span class="ico">📂</span> Project Deep-Dives</span>
+        <span class="win-controls"><span>_</span><span>□</span><span class="close">✕</span></span>
+      </div>
+      <div class="win-body">
+        <a href="index.html" class="back-link">← back to home</a>
+        <h1>Project <span class="gradient-text">Deep-Dives</span></h1>
+        <p>The full story behind the things I've built: architecture, the decisions I made, and (just as importantly) the gripes and gotchas I ran into along the way.</p>
+      </div>
+    </div>
+  </header>
+
+  <nav class="proj-toc" id="projToc">
+    <div class="proj-toc-inner">
+      <a href="#phishnet" class="active">🛡️ PhishNet AI</a>
+      <a href="#puremark">📝 PureMark</a>
+      <a href="#atop">📊 Atop Visualizer</a>
+      <a href="#medicheck">🩺 MediCheck AI</a>
+      <a href="#ryujinx">🎮 Ryujinx Configurator</a>
+    </div>
+  </nav>
+
+  <article class="dd-project" id="phishnet">
+    <div class="win">
+      <div class="win-bar">
+        <span class="win-title"><span class="ico">🛡️</span> PhishNet AI</span>
+        <span class="win-controls"><span>_</span><span>□</span><span class="close">✕</span></span>
+      </div>
+      <div class="win-body">
+    <div class="dd-header">
+      <div class="dd-eyebrow">
+        <div class="dd-icon">🛡️</div>
+        <span class="dd-pill">Hackathon · Bitcamp 2025</span>
+        <span class="dd-when">April 2025</span>
+      </div>
+      <h2>PhishNet AI</h2>
+      <p class="dd-tagline">A Chrome extension that catches phishing sites in real time, blocks them automatically, and explains <em>why</em> a page is dangerous in plain English.</p>
+    </div>
+
+    <div class="dd-meta">
+      <div><div class="k">Type</div><div class="v">Browser extension</div></div>
+      <div><div class="k">Stack</div><div class="v">Manifest V3, JS</div></div>
+      <div><div class="k">APIs</div><div class="v">VirusTotal · Gemini</div></div>
+      <div><div class="k">Team</div><div class="v">Hackathon team</div></div>
+      <div><div class="k">Status</div><div class="v">Prototype</div></div>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> What it does</h3>
+      <p>PhishNet AI sits in the browser and watches where you navigate. When you hit a site it hasn't cleared, it checks the URL against threat intelligence, and if the page looks malicious it blocks the navigation before the page can do any damage, then tells you, in human language, what tipped it off.</p>
+      <ul>
+        <li>Scans every URL you visit against <strong>VirusTotal's</strong> aggregated threat database.</li>
+        <li>Feeds flagged results to <strong>Gemini</strong>, which writes a short, non-technical explanation of the risk.</li>
+        <li>Automatically blocks access to domains identified as phishing, with a warning interstitial.</li>
+      </ul>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> How it's built</h3>
+      <div class="dd-stack"><span>Manifest V3</span><span>Service Worker</span><span>chrome.tabs</span><span>chrome.storage</span><span>VirusTotal v3</span><span>Gemini 2.0 Flash</span><span>Vanilla JS</span></div>
+      <p>A background <strong>service worker</strong> (<code>background.js</code>) listens to <code>chrome.tabs.onUpdated</code> on every navigation and runs a two-stage check. First, the URL is matched against a ~150-entry list of remote-monitoring/RMM tool domains that tech-support scams routinely abuse. If it hits, the tab is redirected to a custom <code>intercept.html</code> warning the user can bypass per-domain (the bypass list lives in <code>chrome.storage.local</code>). Otherwise the URL is base64url-encoded and queried against the <strong>VirusTotal v3 API</strong>; if <code>last_analysis_stats.malicious &gt; 0</code>, the flagged-vendor list is pulled out of <code>last_analysis_results</code>, handed to <strong>Gemini 2.0 Flash</strong> with a prompt asking for a 2–3 sentence plain-English explanation, stashed in <code>chrome.storage.local</code>, and the tab is redirected to <code>blocked.html</code>. A small <code>popup.html</code> exposes a master enable/disable toggle.</p>
+      <pre>chrome.tabs.onUpdated  (every navigation)
+      │
+      ├──► matches RMM-tool list?  ──yes──►  intercept.html  (user can bypass)
+      │
+      ▼
+  VirusTotal v3 API  (URL → base64url → /api/v3/urls/{id})
+      │
+      ├──► clean → let it through
+      │
+      ▼ flagged
+  Gemini 2.0 Flash  (vendor list → 2–3 sentence summary)
+      │
+      ▼
+  chrome.storage.local + redirect to blocked.html</pre>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> Gripes &amp; issues</h3>
+      <div class="gripe-grid">
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">Six URL-checking APIs before we picked one</span><span class="gripe-tag">resolved</span></div>
+          <p>We evaluated around six different URL-reputation APIs before settling on VirusTotal. The constraint wasn't accuracy alone. we needed enough per-vendor heuristic detail to feed Gemini for the plain English summary. Most of them returned a flat verdict and nothing to explain, which would have made the "tell the user why" half of the project impossible.</p>
+        </div>
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">Pre-trained URL classifiers were too noisy</span><span class="gripe-tag">resolved</span></div>
+          <p>The first instinct was to run a pretrained URL-classification model locally. Two problems killed it: a high false-positive rate on benign sites, and inference cost that didn't fit the hackathon budget. Dropping it for a VirusTotal lookup let the extension stay light and made the verdicts auditable. In other words, every block points to specific named vendors that flagged the site.</p>
+        </div>
+        <div class="gripe open">
+          <div class="gripe-head"><span class="g-title">No good way to plug a database into an MV3 extension</span><span class="gripe-tag">design tension</span></div>
+          <p>We wanted a local cache of already-checked URLs to cut repeat API calls. Manifest Version 3 doesn't make it easy to hook a real database to a service worker, and <code>chrome.storage</code> isn't sized for a proper URL index. We sidestepped it by leaning on VirusTotal's own database as the cache, where every lookup hits a corpus broader than anything we'd have built ourselves.</p>
+        </div>
+        <div class="gripe pain">
+          <div class="gripe-head"><span class="g-title">MV3's API-routing restrictions</span><span class="gripe-tag">pain point</span></div>
+          <p>Manifest V3 is strict about how a service worker is allowed to talk to external endpoints, and figuring out the right pattern for routing the VirusTotal + Gemini calls through the background script ate a big chunk of the hackathon. Once it clicked, the whole pipeline collapsed into a single <code>chrome.tabs.onUpdated</code> listener that fans out to both APIs and redirects the tab on a hit. However, getting there was easily the most painful research stretch.</p>
+        </div>
+      </div>
+    </div>
+      </div>
+    </div>
+  </article>
+
+  <article class="dd-project" id="puremark">
+    <div class="win">
+      <div class="win-bar">
+        <span class="win-title"><span class="ico">📝</span> PureMark</span>
+        <span class="win-controls"><span>_</span><span>□</span><span class="close">✕</span></span>
+      </div>
+      <div class="win-body">
+    <div class="dd-header">
+      <div class="dd-eyebrow">
+        <div class="dd-icon">📝</div>
+        <span class="dd-pill">Personal project · actively shipping</span>
+        <span class="dd-when">August 2024 - present</span>
+      </div>
+      <h2>PureMark</h2>
+      <p class="dd-tagline">A cross-platform desktop Markdown editor with a live PDF preview and real LaTeX typesetting: no system TeX install required. Write Markdown on the left, watch a print-quality PDF build on the right, then export to PDF, DOCX, LaTeX, or Typst. PDF exports are visually identical to Overleaf's PDF exports, but much easier to write.</p>
+    </div>
+
+    <div class="dd-meta">
+      <div><div class="k">Type</div><div class="v">Desktop app (Tauri 2)</div></div>
+      <div><div class="k">Backend</div><div class="v">Rust</div></div>
+      <div><div class="k">Frontend</div><div class="v">React + TypeScript</div></div>
+      <div><div class="k">Engine</div><div class="v">Pandoc + Tectonic</div></div>
+      <div><div class="k">Editor</div><div class="v">Ace (with Vim mode)</div></div>
+      <div><div class="k">Status</div><div class="v">In active use</div></div>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> What it does</h3>
+      <p>PureMark started as a simple Markdown-to-PDF converter and grew into a full local-first writing environment. It manages projects under <code>~/Documents/PureMark</code> (each with its own assets and timestamped backups), gives you a real code editor with Vim keybindings, and renders a live, page-by-page PDF preview as you type. When you're happy, one click exports to PDF, DOCX, a self-contained LaTeX <code>.zip</code>, or a Typst <code>.zip</code>.</p>
+      <ul>
+        <li><strong>Live PDF preview</strong>:  debounced re-render, lazy per-page rendering via <code>IntersectionObserver</code>, and scroll position preserved across rebuilds.</li>
+        <li><strong>Math &amp; diagrams</strong>: MathLive for equation editing, and visual builders for Mermaid flowcharts and sequence diagrams with full round-trip parsing.</li>
+        <li><strong>Zero-setup typesetting</strong>: Pandoc and Tectonic ship inside the app, so users never install LaTeX.</li>
+        <li><strong>Safety nets</strong>: autosave every 5s, rolling backups every 30s (capped at 50 per project).</li>
+        <li><strong>Friendly errors</strong>: LaTeX's wall of log output is parsed into human-readable messages, with a raw-log toggle for when you need it.</li>
+      </ul>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> Architecture</h3>
+      <div class="dd-stack"><span>Tauri 2</span><span>Rust</span><span>React 18</span><span>TypeScript</span><span>Vite</span><span>Ace editor</span><span>pdf.js / react-pdf</span><span>MathLive</span><span>Mermaid</span><span>Pandoc 3.9</span><span>Tectonic 0.16</span></div>
+      <p>It's a Tauri app: a Rust core exposes <code>#[tauri::command]</code> functions (project CRUD, asset handling, backups, and the render/export pipeline) that the React frontend calls over Tauri's IPC. Rather than depending on whatever's on the user's <code>PATH</code>, PureMark bundles <strong>Pandoc</strong> and <strong>Tectonic</strong> (a self-contained LaTeX engine) as Tauri <code>externalBin</code> sidecars, pinned and fetched by a build script.</p>
+      <pre>React + Ace editor  ──(debounced edit)──►  preprocess Mermaid → PNG
+        │                                            │
+        │  Tauri IPC (invoke)                        ▼
+        ▼                                   stage markdown to cache
+   Rust core  ──►  Pandoc  ──(--pdf-engine=tectonic)──►  Tectonic  ──►  PDF
+        │                                                                │
+        ◄──────────────  base64 PDF + parsed error log  ◄───────────────┘
+        │
+        ▼
+   pdf.js renders pages lazily into the preview pane</pre>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> Gripes &amp; issues</h3>
+      <div class="gripe-grid">
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">WebKitGTK taints SVG-drawn canvases</span><span class="gripe-tag">resolved</span></div>
+          <p>Mermaid diagrams render to SVG in the browser, then get rasterized to PNG through a <code>&lt;canvas&gt;</code> so Pandoc can embed them. On Linux, Tauri uses the WebKitGTK webview, and it <strong>taints any canvas drawn from a <code>blob:</code>-URL SVG</strong>, so <code>canvas.toBlob()</code> throws <code>SecurityError</code>. The fix: feed the SVG in as a percent-encoded <code>data:</code> URL instead, which bypasses the taint. (There's a sibling workaround in the build script too, <code>WEBKIT_DISABLE_DMABUF_RENDERER=1</code>, to dodge a WebKitGTK rendering bug that blanks the window on some GPUs.)</p>
+        </div>
+        <div class="gripe pain">
+          <div class="gripe-head"><span class="g-title">Pandoc's --pdf-engine won't take a path</span><span class="gripe-tag">pain point</span></div>
+          <p>Pandoc's <code>--pdf-engine</code> only accepts an engine <em>name</em> that it looks up on <code>PATH</code>. It refuses an absolute path. But the bundled binary is named <code>tectonic-x86_64-unknown-linux-gnu</code> and lives in the app's resource dir, not on <code>PATH</code>. The workaround: create a "shim" directory containing a <code>tectonic</code> symlink to the real sidecar, then prepend that dir to <code>PATH</code> just for the Pandoc invocation. On Windows, where symlinks need admin/developer mode, it copies the binary instead.</p>
+        </div>
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">Mermaid v11 collapses the diagram aspect ratio</span><span class="gripe-tag">resolved</span></div>
+          <p>Mermaid v11 emits SVGs with <code>width="100%"</code> as a presentation hint. When rasterizing, <code>parseFloat</code> reads that as <code>100px</code>, squashing the diagram and leaving big whitespace bands in the PNG. Fix: read the intrinsic size from the SVG's <code>viewBox</code> first, only falling back to the width/height attributes (and finally a sane default) if it's missing.</p>
+        </div>
+        <div class="gripe open">
+          <div class="gripe-head"><span class="g-title">Cold-cache LaTeX warmup takes ~30s</span><span class="gripe-tag">platform reality</span></div>
+          <p>Tectonic downloads its LaTeX package bundle on first use, so the very first PDF build takes about 30 seconds while everything else is instant. PureMark detects a cold cache (<code>is_tectonic_cache_warm</code>) and shows a one-time "warming up" notice so it doesn't look frozen, and routes the cache under the app's data dir. A fully offline bundled <code>.tar</code> is the eventual fix.</p>
+        </div>
+        <div class="gripe pain">
+          <div class="gripe-head"><span class="g-title">LaTeX errors are hostile to normal users</span><span class="gripe-tag">pain point</span></div>
+          <p>A stray special character or a missing package makes Tectonic fail with a wall of log output that's meaningless to someone who's never touched LaTeX. The Rust side parses the log into <em>friendly errors</em> (missing-package, undefined-control-sequence with the offending line number, generic build-failure), surfaced as readable messages, with a "RAW" toggle for when you actually want the gory detail. It's a real improvement, but mapping every possible LaTeX failure to a friendly message is a bottomless task.</p>
+        </div>
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">Preview jank: scroll jumps and overlapping renders</span><span class="gripe-tag">resolved</span></div>
+          <p>Two preview headaches, both fixed. First, every rebuild swapped the whole PDF and threw you back to the top, so now it captures the scroll ratio before a render and restores it after, unless you scrolled manually in the meantime. Second, fast typing could kick off a new render before the previous one finished; a real time guard combines those, queuing at most one follow-up instead of stacking them.</p>
+        </div>
+        <div class="gripe open">
+          <div class="gripe-head"><span class="g-title">Single-platform binaries (for now)</span><span class="gripe-tag">tech debt</span></div>
+          <p>The fetch script and resolver are wired for <code>x86_64-unknown-linux-gnu</code> today. The Rust resolver already handles Windows naming/EXE suffixes and the console-window detach, so cross-platform builds are mostly a matter of fetching the other platforms' Pandoc/Tectonic binaries. Not completely done yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> Why it's deceptively complex</h3>
+      <p>On the surface it's "Markdown in, PDF out." Underneath, it's a two way Rust to JS IPC boundary, a bundled-binary toolchain that has to be located and handled differently per OS, a client-side diagram pipeline fighting a webview's security model, a virtualized LaTeX cache, and a live preview that has to feel instant without re-rendering the world on every keystroke. Most of the engineering here is in the seams between those pieces, which is exactly the undocumented edge-case work I enjoy.</p>
+    </div>
+      </div>
+    </div>
+  </article>
+
+  <article class="dd-project" id="atop">
+    <div class="win">
+      <div class="win-bar">
+        <span class="win-title"><span class="ico">📊</span> Atop Log Parser &amp; Visualizer</span>
+        <span class="win-controls"><span>_</span><span>□</span><span class="close">✕</span></span>
+      </div>
+      <div class="win-body">
+    <div class="dd-header">
+      <div class="dd-eyebrow">
+        <div class="dd-icon">📊</div>
+        <span class="dd-pill">Tooling</span>
+        <span class="dd-when">June 2024</span>
+      </div>
+      <h2>Atop Log Parser &amp; Visualizer</h2>
+      <p class="dd-tagline">A C++ tool that parses mission log files for CPU and RAM performance data and renders it as interactive d3.js charts on a dynamic web frontend.</p>
+    </div>
+
+    <div class="dd-meta">
+      <div><div class="k">Type</div><div class="v">Parser + visualizer</div></div>
+      <div><div class="k">Parser</div><div class="v">C++</div></div>
+      <div><div class="k">Frontend</div><div class="v">d3.js, HTML/CSS/JS</div></div>
+      <div><div class="k">Scale</div><div class="v">Large log files</div></div>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> What it does</h3>
+      <p>Built around the Linux <code>atop</code> performance monitor's logs, this tool reads raw mission-log output, extracts CPU and RAM time-series data, and presents it as interactive charts so operators can spot performance regressions and resource spikes at a glance.</p>
+      <ul>
+        <li>C++ parser reads and interprets mission log files for CPU/RAM performance data.</li>
+        <li>Interactive charts and graphs rendered with <strong>d3.js</strong> on a dynamic web frontend.</li>
+        <li>Parsing algorithms optimized to handle very large logs efficiently, cutting analysis time.</li>
+      </ul>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> How it's built</h3>
+      <div class="dd-stack"><span>C++</span><span>atop</span><span>d3.js (vendored)</span><span>HTML / CSS / JS</span></div>
+      <p>A C++ parser ingests raw atop dumps, extracts the CPU/RAM time-series, and emits the report as static HTML. The parser is also the page generator. The frontend is plain HTML/CSS with d3.js for the interactive charts, with no React, no build step, and no package manager involvement. d3.js itself is checked into the source tree as a copy of the minified CDN bundle.</p>
+      <pre>atop log file  (huge, raw)
+      │
+      ▼
+  C++ parser  ──►  CPU / RAM time-series  ──►  emits raw HTML
+                                                  │
+                                                  ▼
+                                       static page + vendored d3.js
+                                                  │
+                                                  ▼
+                                       interactive CPU / RAM charts</pre>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> Gripes &amp; issues</h3>
+      <div class="gripe-grid">
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">Python parser couldn't keep up</span><span class="gripe-tag">resolved</span></div>
+          <p>The first version was in Python. This is quick to write, but on the kind of multi-gigabyte logs atop produces, parse times were unworkable. I rewrote the whole parser in C++ and the runtime increasedtenfold. Same parsing algorithm, and yielded the same output, but the program was no longer bottlenecked by the Python interpreter.</p>
+        </div>
+        <div class="gripe pain">
+          <div class="gripe-head"><span class="g-title">Sandboxed environment, package-approval friction</span><span class="gripe-tag">pain point</span></div>
+          <p>Everything we wanted to install needed sign-off, and the only approved visualization library at the start was matplotlib. matplotlib's static plots couldn't surface the patterns operators were actually looking for in a multi-hour log where you needed to zoom, hover, and compare ranges, not just stare at a snapshot.</p>
+        </div>
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">Getting d3.js in without an installer</span><span class="gripe-tag">workaround</span></div>
+          <p>I pivoted to d3.js for the interactive charts, but the package install path conflicted with other approved tooling. The workaround was crude and effective: drop the entire minified d3 CDN bundle directly into the source tree and serve it as a static asset.</p>
+        </div>
+        <div class="gripe open">
+          <div class="gripe-head"><span class="g-title">No frontend framework allowed</span><span class="gripe-tag">design tension</span></div>
+          <p>React / Vue / anything modern were off the table, which meant the C++ parser had to be the page generator too. String-building HTML files directly instead of producing JSON for a frontend to consume. Not elegant, but it kept the whole tool to a single self-contained binary plus a folder of static files, which was actually a feature in that environment.</p>
+        </div>
+      </div>
+    </div>
+      </div>
+    </div>
+  </article>
+
+  <article class="dd-project" id="medicheck">
+    <div class="win">
+      <div class="win-bar">
+        <span class="win-title"><span class="ico">🩺</span> MediCheck AI</span>
+        <span class="win-controls"><span>_</span><span>□</span><span class="close">✕</span></span>
+      </div>
+      <div class="win-body">
+    <div class="dd-header">
+      <div class="dd-eyebrow">
+        <div class="dd-icon">🩺</div>
+        <span class="dd-pill">Hackathon · Bitcamp 2024</span>
+        <span class="dd-when">April 2024</span>
+      </div>
+      <h2>MediCheck AI</h2>
+      <p class="dd-tagline">An AI-driven pre-diagnosis tool: enter your symptoms, history, and lifestyle, and a custom MedLLaMa2 model returns preliminary health insights.</p>
+    </div>
+
+    <div class="dd-meta">
+      <div><div class="k">Type</div><div class="v">Local web app</div></div>
+      <div><div class="k">Model</div><div class="v">MedLLaMa2 (LLaMa2 fork)</div></div>
+      <div><div class="k">Frontend</div><div class="v">HTML / CSS form</div></div>
+      <div><div class="k">Backend</div><div class="v">Flask + Ollama</div></div>
+      <div><div class="k">Target hardware</div><div class="v">8 GB RAM, runs on a Pi 5</div></div>
+      <div><div class="k">Team</div><div class="v">4 @ Bitcamp 2024</div></div>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> What it does</h3>
+      <p>MediCheck AI gives users a quick, accessible first pass at understanding their symptoms. Through a straightforward web form, users describe what they're experiencing along with relevant history and lifestyle factors, and a medical-domain language model returns preliminary insights, explicitly framed as a starting point, not a diagnosis. The whole stack runs locally on consumer hardware, so it works in places without reliable internet.</p>
+      <ul>
+        <li>Plain HTML form for age, symptoms, duration, severity, history, surgeries, family history, fitness, and substance use.</li>
+        <li>Powered by <strong>MedLLaMa2</strong>, a medical-domain fine-tune of Meta's LLaMa2, served locally through <strong>Ollama</strong>.</li>
+        <li>Designed to run on modest hardware (8 GB RAM, ~4-core CPU), and tested on a <strong>Raspberry Pi 5</strong>, so it's usable in offline / underserved settings.</li>
+      </ul>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> How it's built</h3>
+      <div class="dd-stack"><span>Python</span><span>Flask</span><span>Ollama</span><span>MedLLaMa2</span><span>HTML / CSS</span></div>
+      <p>The frontend is a static HTML form. Flask receives the POST, stitches the answers into a single structured prompt (with an explicit instruction prepended that the response must lead with a "preliminary diagnosis, not professional medical advice" disclaimer), and pipes that prompt into a locally-running <strong>MedLLaMa2</strong> via Ollama. The response streams back token-by-token.</p>
+      <pre>HTML form  (age, symptoms, history, lifestyle, …)
+      │
+      ▼
+  Flask  ──►  stitches answers into a single prompt
+      │       (+ disclaimer instruction prepended)
+      ▼
+  Ollama (local)  ──►  MedLLaMa2 inference  (streamed)
+      │
+      ▼
+  plain-English preliminary insight + safety disclaimer</pre>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> Gripes &amp; issues</h3>
+      <div class="gripe-grid">
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">Running a medical LLM at a hackathon</span><span class="gripe-tag">resolved</span></div>
+          <p>Big models don't run on hackathon hardware. We deliberately picked MedLLaMa2, which is small enough to serve through Ollama on a consumer laptop with 8 GB of RAM and no GPU. The same configuration runs on a Raspberry Pi 5, which was the whole point: usability in places without a fast internet connection, where calling a hosted LLM isn't an option to begin with.</p>
+        </div>
+        <div class="gripe open">
+          <div class="gripe-head"><span class="g-title">Hallucinations in a medical context</span><span class="gripe-tag">design tension</span></div>
+          <p>An LLM confidently inventing a diagnosis is genuinely dangerous here. We handle it at the prompt layer: every request appends an explicit instruction asking the model to <em>lead</em> with "this is a preliminary diagnosis, not a substitute for professional medical advice." It's not a real safety guarantee, but it gets the framing in front of every response without us having to police the UI.</p>
+        </div>
+        <div class="gripe open">
+          <div class="gripe-head"><span class="g-title">The form is static</span><span class="gripe-tag">future iteration</span></div>
+          <p>Right now the questionnaire is hardcoded, where you fill in everything up front and submit once. The obvious next step is branching follow-ups: if a symptom is listed, ask about its onset; then duration; then location. The model could do meaningfully better with that kind of progressive context, and it's the iteration we ran out of hackathon hours for.</p>
+        </div>
+      </div>
+    </div>
+      </div>
+    </div>
+  </article>
+
+  <article class="dd-project" id="ryujinx">
+    <div class="win">
+      <div class="win-bar">
+        <span class="win-title"><span class="ico">🎮</span> Ryujinx Configurator</span>
+        <span class="win-controls"><span>_</span><span>□</span><span class="close">✕</span></span>
+      </div>
+      <div class="win-body">
+    <div class="dd-header">
+      <div class="dd-eyebrow">
+        <div class="dd-icon">🎮</div>
+        <span class="dd-pill">Personal project · open source</span>
+        <span class="dd-when">2025</span>
+      </div>
+      <h2>Ryujinx Configurator</h2>
+      <p class="dd-tagline">A controller-friendly, fullscreen tool for binding gamepads in the Ryujinx Switch emulator, straight from Steam Big Picture Mode, no desktop, no mouse, and no fiddling with Ryujinx's own config window.</p>
+    </div>
+
+    <div class="dd-meta">
+      <div><div class="k">Type</div><div class="v">Desktop utility</div></div>
+      <div><div class="k">Language</div><div class="v">Python</div></div>
+      <div><div class="k">UI</div><div class="v">pygame (fullscreen)</div></div>
+      <div><div class="k">Input</div><div class="v">SDL controller API</div></div>
+      <div><div class="k">Target</div><div class="v">Steam Deck / Linux</div></div>
+      <div><div class="k">Repo</div><div class="v"><a href="https://github.com/mayitreya/ryujinx-configurator" target="_blank" rel="noopener">GitHub ↗</a></div></div>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> The problem</h3>
+      <p>Picture couch co-op: friends come over with their controllers, you want to play Mario Kart, and now everyone's waiting while you drop to desktop mode, open Ryujinx, and bind each pad by hand. It's slow, it's awkward, and it pulls you out of the living-room experience entirely.</p>
+      <p>Ryujinx Configurator fixes that. It's a fully controller-navigable interface you can add to Steam as a non-Steam game and launch right from Big Picture / Gaming Mode, bind everyone's controllers in seconds, hit save, and you're playing. It was built and tested primarily on the Steam Deck (and a Nobara Linux PC).</p>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> How it's built</h3>
+      <div class="dd-stack"><span>Python 3.8+</span><span>pygame</span><span>pygame._sdl2 (controller)</span><span>PyInstaller --onefile</span><span>Ryujinx Config.json</span></div>
+      <p>It's a single pygame app running fullscreen, driven entirely by a small <strong>state machine</strong>: <code>MENU</code> (pick a player slot) → <code>DETECT</code> (press a button on the controller/keyboard you want to bind) → <code>MAPPING</code> (the list of Switch inputs) → <code>SELECTOR</code> (choose what each maps to). Input comes through SDL's normalized controller layer, with a fallback to raw joystick button indices for pads SDL doesn't recognize.</p>
+      <p>The actual job is reading and writing Ryujinx's <code>Config.json</code>. The tool backs up the original on first run, writes atomically (temp file + <code>os.replace</code>), and disables saving entirely if the existing config is unreadable, so it can never corrupt a working setup.</p>
+      <pre>controller / keyboard input
+            │  (SDL, normalized + raw fallback)
+            ▼
+   MENU → DETECT → MAPPING → SELECTOR
+            │
+            ▼
+   GUID conversion (SDL ⇄ Ryujinx)
+            │
+            ▼
+   atomic write → Ryujinx Config.json   (backup kept as .bak)</pre>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> The GUID rabbit hole</h3>
+      <p>The single hardest part was figuring out how Ryujinx identifies controllers. It does <em>not</em> use the standard, documented SDL controller GUID. Instead it stores the id as <code>new Guid(sdlGuidHex).ToString()</code>, which means .NET's <code>Guid</code> reverses the byte order of the first three fields (a 4-byte, a 2-byte, and a 2-byte chunk) while leaving the rest alone. In other words, a mixed big-endian/little-endian layout within the same value.</p>
+      <p>There's an extra twist: Ryujinx zeroes the CRC16 that SDL stuffs into bytes 2–3 (a name/info checksum that varies and shouldn't affect device matching). I verified this against a Bluetooth Switch Pro Controller. SDL reported CRC <code>0x15b7</code>, Ryujinx wrote <code>0000</code>. The converter reproduces both behaviors:</p>
+      <pre>b = [guid[i:i+2] for i in range(0, 32, 2)]   # 16 bytes
+b[2] = b[3] = "00"                            # zero the CRC16
+g1 = b[3] + b[2] + b[1] + b[0]                # reversed (4 bytes)
+g2 = b[5] + b[4]                              # reversed (2 bytes)
+g3 = b[7] + b[6]                              # reversed (2 bytes)
+g4 = b[8] + b[9]                              # as-is
+g5 = "".join(b[10:16])                        # as-is</pre>
+    </div>
+
+    <div class="dd-section">
+      <h3><span class="hash">#</span> Gripes &amp; issues</h3>
+      <div class="gripe-grid">
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">Ryujinx's non-standard GUID format</span><span class="gripe-tag">reverse-engineered</span></div>
+          <p>This tripped me up for a solid two hours. <span class="g-label">Why does Ryujinx not just use standard SDL controller GUIDs?</span> I had to reverse-engineer how the GUIDs were being generated (big-endian for part of it, little-endian for another part of the <em>same</em> GUID, plus a zeroed-out CRC16). Imagine using a documented standard... couldn't be Ryujinx, apparently. The tool now converts cleanly between standard SDL GUIDs and Ryujinx's big-little-endian format.</p>
+        </div>
+        <div class="gripe pain">
+          <div class="gripe-head"><span class="g-title">Steam Input virtualizes your controller</span><span class="gripe-tag">platform gotcha</span></div>
+          <p>When you launch through Steam Big Picture, Steam Input hides your physical pad and presents a <em>virtual</em> one with a different GUID and a generic name. Moonlight game streaming does the same thing. So a binding made one way silently won't match if you then launch Ryujinx a different way.</p>
+          <p><span class="g-label">The fix:</span> launch the tool and Ryujinx the <em>same</em> way, and use the built-in <strong>Diagnostics overlay</strong> (press <code>D</code>) to compare the exact id/name SDL reports against what Ryujinx lists. I built that overlay specifically to debug this class of "Waiting for controller connection..." mismatch.</p>
+        </div>
+        <div class="gripe open">
+          <div class="gripe-head"><span class="g-title">Multiple identical controllers</span><span class="gripe-tag">hardware limitation</span></div>
+          <p>Two of the same Xbox pad (or several streamed through Moonlight) share a GUID and are told apart only by a connection-order index: <code>(0)</code>, <code>(1)</code>, etc. That order can change between sessions, so an assignment can end up mapped to a different person's controller next time. That's how the controllers identify themselves, not something this tool can work around.</p>
+        </div>
+        <div class="gripe open">
+          <div class="gripe-head"><span class="g-title">Steam won't list the non-Steam app on Linux</span><span class="gripe-tag">workaround documented</span></div>
+          <p>Adding a non-Steam game sometimes just doesn't show the executable in the browse list, on both Steam Deck and my Linux PC. Workaround: add any app that <em>does</em> show up, then edit its properties, point <code>Target</code> at the Config Tool executable (quotes required), set <code>Start in</code> to your home dir (no quotes), no launch options.</p>
+        </div>
+        <div class="gripe open">
+          <div class="gripe-head"><span class="g-title">It's one big monolithic file</span><span class="gripe-tag">tech debt</span></div>
+          <p>The whole thing lives in a single ~840-line <code>main.py</code>. It really should be modularized so the same controller-friendly UI could drive config for <em>other</em> emulators too. That's a "later" task.</p>
+        </div>
+        <div class="gripe fixed">
+          <div class="gripe-head"><span class="g-title">System package conflicts on build</span><span class="gripe-tag">resolved</span></div>
+          <p>My system packages clashed with the app's dependencies, so the build broke until I isolated it. The README now walks through a <code>venv</code> + <code>PyInstaller --onefile</code> flow that sidesteps it entirely.</p>
+        </div>
+      </div>
+    </div>
+
+      </div>
+    </div>
+  </article>
+
+  <footer class="footer">
+    <p><a href="index.html">← Back to home</a></p>
+    <p class="mono">Pure HTML · CSS · JS — no frameworks</p>
+  </footer>
+
+  <div class="start-menu" id="startMenu">
+    <div class="sm-head">Mayitreya Pasumarthy<small>CS Grad &amp; Developer</small></div>
+    <a href="index.html#about">👤 About</a>
+    <a href="index.html#experience">💼 Experience</a>
+    <a href="projects.html">📂 Projects</a>
+    <a href="index.html#skills">🧰 Skills</a>
+    <a href="Mayitreya_Pasumarthy_Resume.pdf" target="_blank" rel="noopener">📄 Resume (PDF)</a>
+    <a href="index.html#contact">✉️ Contact</a>
+  </div>
+
+  <nav class="taskbar">
+    <button class="start-orb" id="startOrb" aria-label="Start menu">🪟</button>
+    <div class="task-nav">
+      <a href="index.html#about">About</a>
+      <a href="index.html#experience">Experience</a>
+      <a href="projects.html">Projects</a>
+      <a href="index.html#skills">Skills</a>
+      <a href="index.html#contact">Contact</a>
+    </div>
+    <div class="tray" id="clock">
+      <div>
+        <div class="clock-time">--:--</div>
+        <div class="clock-date">--</div>
+      </div>
+    </div>
+  </nav>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
